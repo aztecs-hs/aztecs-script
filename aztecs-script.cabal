@@ -15,7 +15,9 @@ library
     ghc-options:      -Wall
     build-depends:
         base ^>=4.20.0.0,
-        aztecs
+        aztecs,
+        containers,
+        parsec
 
 executable aztecs-script
     main-is:          Main.hs
@@ -24,6 +26,7 @@ executable aztecs-script
     ghc-options:      -Wall
     build-depends:
         base ^>=4.20.0.0,
+        aztecs,
         aztecs-script
 
 test-suite aztecs-script-test
