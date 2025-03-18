@@ -9,9 +9,10 @@ module Main where
 
 import Aztecs.ECS hiding (Query, fetch)
 import Aztecs.Script hiding (Component)
+import Aztecs.Script.Decoder
+import Aztecs.Script.Interpreter
 import Control.Monad
 import Control.Monad.IO.Class
-import Aztecs.Script.Decoder
 
 newtype Position = Position Int deriving (Show)
 
@@ -43,7 +44,7 @@ script =
 
 run :: SystemT IO ()
 run = do
-  let rt = insertComponent @Position "position" $ insertComponent @Velocity "velocity" mempty
+  let rt = export @Position "position" <> export @Velocity "velocity"
       q = buildQuery script rt
   positions <- fromSystem $ query q
   liftIO $ print positions
