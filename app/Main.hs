@@ -39,8 +39,7 @@ instance ScriptComponent Velocity where
 script :: String
 script =
   encodeQuery $
-    (fetch @Position `as` #p ? fetch @Velocity `as` #v)
-      `returning` (#p :. #x :& #v :. #v)
+    fetch @Position `as` #p <?> fetch @Velocity `as` #v `returning` #p :. #x :& #v :. #v
 
 run :: SystemT IO ()
 run = do

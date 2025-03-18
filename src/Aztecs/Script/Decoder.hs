@@ -6,7 +6,38 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module Aztecs.Script.Decoder where
+-- |
+-- Module      : Aztecs.Script.Decoder
+-- Copyright   : (c) Matt Hunzinger, 2025
+-- License     : BSD-style (see the LICENSE file in the distribution)
+--
+-- Maintainer  : matt@hunzinger.me
+-- Stability   : provisional
+-- Portability : non-portable (GHC extensions)
+module Aztecs.Script.Decoder
+  ( -- * Decoder
+    Decoder (..),
+    decodeQuery,
+
+    -- ** Parser
+    skipSpaces,
+    skipSpaces1,
+    simpleDecoderParser,
+    asClauseParser,
+    andChainParser,
+    fieldAccessParser,
+    returningFieldsParser,
+    returningClauseParser,
+    decoderParser,
+
+    -- * Internal
+    FieldAccess (..),
+    Primitive (..),
+    ScriptComponent (..),
+    DynamicScriptComponent (..),
+    getFieldDyn,
+  )
+where
 
 import Data.Kind
 import Data.Maybe

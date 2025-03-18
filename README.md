@@ -9,8 +9,7 @@ This package provides both fully-typed Haskell DSL for scripting as well as a lo
 #### Haskell:
 
 ```hs
-(fetch @Position `as` #p ? fetch @Velocity `as` #v)
-  `returning` (#p :. #x :& #v :. #v)
+fetch @Position `as` #p <?> fetch @Velocity `as` #v `returning` #p :. #x :& #v :. #v
 ```
 
 #### aztecs-script:
@@ -34,11 +33,12 @@ FETCH position AS p AND FETCH velocity AS v RETURNING (p.x, v.v)
 ```hs
 import Aztecs.ECS hiding (Query, fetch)
 import Aztecs.Script hiding (Component)
+import Aztecs.Script.Decoder
+import Aztecs.Script.Interpreter
 import Control.Monad
 import Control.Monad.IO.Class
-import Data.Data
 
-newtype Position = Position Int deriving (Show, Data)
+newtype Position = Position Int deriving (Show)
 
 instance Component Position
 
@@ -63,12 +63,11 @@ instance ScriptComponent Velocity where
 script :: String
 script =
   encodeQuery $
-    (fetch @Position `as` #p ? fetch @Velocity `as` #v)
-      `returning` (#p :. #x :& #v :. #v)
+    fetch @Position `as` #p <?> fetch @Velocity `as` #v `returning` #p :. #x :& #v :. #v
 
 run :: SystemT IO ()
 run = do
-  let rt = insertComponent @Position "position" $ insertComponent @Velocity "velocity" mempty
+  let rt = export @Position "position" <> export @Velocity "velocity"
       q = buildQuery script rt
   positions <- fromSystem $ query q
   liftIO $ print positions

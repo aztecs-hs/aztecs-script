@@ -6,12 +6,29 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
-module Aztecs.Script.Interpreter where
+-- |
+-- Module      : Aztecs.Script.Interpreter
+-- Copyright   : (c) Matt Hunzinger, 2025
+-- License     : BSD-style (see the LICENSE file in the distribution)
+--
+-- Maintainer  : matt@hunzinger.me
+-- Stability   : provisional
+-- Portability : non-portable (GHC extensions)
+module Aztecs.Script.Interpreter
+  ( -- * Interpreter
+    Interpreter (..),
+    export,
+    buildQuery,
+
+    -- * Internal
+    Scope (..),
+    buildDecoder,
+  )
+where
 
 import qualified Aztecs.ECS.Component as C
 import qualified Aztecs.ECS.Query as Q
 import Aztecs.Script.Decoder
-import Data.Dynamic
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Typeable
@@ -64,11 +81,3 @@ queryProxy _ = Q.fetch
 
 queryComponentProxy :: ComponentProxy -> Q.Query DynamicScriptComponent
 queryComponentProxy (ComponentProxy p) = DynamicScriptComponent <$> queryProxy p
-
-getFieldComponentProxy :: String -> ComponentProxy -> Dynamic -> Maybe Primitive
-getFieldComponentProxy fieldName (ComponentProxy p) d = getFieldProxy fieldName p d
-
-getFieldProxy :: forall a. (Typeable a, ScriptComponent a) => String -> Proxy a -> Dynamic -> Maybe Primitive
-getFieldProxy fieldName _ d = case fromDynamic @a d of
-  Just a -> getField fieldName a
-  Nothing -> error "TODO"

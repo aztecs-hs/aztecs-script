@@ -14,7 +14,32 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Aztecs.Script where
+-- |
+-- Module      : Aztecs.Script
+-- Copyright   : (c) Matt Hunzinger, 2025
+-- License     : BSD-style (see the LICENSE file in the distribution)
+--
+-- Maintainer  : matt@hunzinger.me
+-- Stability   : provisional
+-- Portability : non-portable (GHC extensions)
+module Aztecs.Script
+  ( (:::),
+    HasField,
+    KnownAlias,
+    KnownAliasT,
+    (:&) (..),
+    Component (..),
+    component,
+    (:.) (..),
+    Row (..),
+    Query (..),
+    fetch,
+    as,
+    returning,
+    (<?>),
+    encodeQuery,
+  )
+where
 
 import Aztecs.Script.Decoder
 import Data.Data
@@ -86,13 +111,15 @@ fetch = Fetch
 as :: (KnownSymbol s') => Query s a -> Alias s' -> Query ('(s', a) ': s) ()
 as = As
 
+infixr 2 `returning`
+
 returning :: (Row s r) => Query s a -> r -> Query s ()
 returning = Returning
 
-infixr 5 ?
+infixr 5 <?>
 
-(?) :: Query s () -> Query s' () -> Query (s ++ s') ()
-(?) = And
+(<?>) :: Query s () -> Query s' () -> Query (s ++ s') ()
+(<?>) = And
 
 data Alias (alias :: Symbol) = Alias deriving (Eq, Ord, Show)
 
@@ -107,4 +134,3 @@ encodeQuery Fetch = "FETCH " ++ queryId @a
 encodeQuery (As q a) = encodeQuery q ++ " AS " ++ aliasVal a
 encodeQuery (Returning q r) = encodeQuery q ++ " RETURNING (" ++ encodeRow @s r ++ ")"
 encodeQuery (And a b) = encodeQuery a ++ " AND " ++ encodeQuery b
-
