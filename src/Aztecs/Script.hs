@@ -20,7 +20,7 @@ import qualified Aztecs.ECS.Component as C
 import qualified Aztecs.ECS.Query as Q
 import Aztecs.Script.Decoder
 import Data.Data
-import Data.Dynamic (Dynamic, fromDynamic, toDyn)
+import Data.Dynamic (Dynamic, fromDynamic)
 import Data.Kind
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -118,8 +118,8 @@ data ComponentProxy = forall a. (C.Component a, ScriptComponent a) => ComponentP
 queryProxy :: (C.Component a) => Proxy a -> Q.Query a
 queryProxy _ = Q.fetch
 
-queryComponentProxy :: ComponentProxy -> Q.Query Dynamic
-queryComponentProxy (ComponentProxy p) = toDyn <$> queryProxy p
+queryComponentProxy :: ComponentProxy -> Q.Query DynamicScriptComponent
+queryComponentProxy (ComponentProxy p) = DynamicScriptComponent <$> queryProxy p
 
 getFieldComponentProxy :: String -> ComponentProxy -> Dynamic -> Maybe Primitive
 getFieldComponentProxy fieldName (ComponentProxy p) d = getFieldProxy fieldName p d
@@ -135,8 +135,8 @@ newtype Runtime = Runtime {unRuntime :: Map String ComponentProxy}
 insertComponent :: forall a. (C.Component a, ScriptComponent a) => String -> Runtime -> Runtime
 insertComponent name rt = Runtime $ Map.insert name (ComponentProxy (Proxy @a)) (unRuntime rt)
 
-newtype Scope = Scope {unScope :: Map String (String, Dynamic)}
-  deriving (Show, Semigroup, Monoid)
+newtype Scope = Scope {unScope :: Map String (String, DynamicScriptComponent)}
+  deriving (Semigroup, Monoid)
 
 buildQuery :: String -> Runtime -> Q.Query [Primitive]
 buildQuery = buildDecoder . decodeQuery
@@ -160,10 +160,8 @@ buildDecoder' (ReturningDecoder dec fields) rt =
       let primitives =
             map
               ( \(FieldAccess record f) -> case unScope scope Map.!? record of
-                  Just (ty, dyn) -> case unRuntime rt Map.!? ty of
-                    Just cp -> case getFieldComponentProxy f cp dyn of
-                      Just d -> d
-                      Nothing -> error ""
+                  Just (_, dyn) -> case getFieldDyn f dyn of
+                    Just d -> d
                     Nothing -> error ""
                   Nothing -> error ""
               )
@@ -171,13 +169,3 @@ buildDecoder' (ReturningDecoder dec fields) rt =
        in (primitives, scope)
   )
     <$> buildDecoder' dec rt
-
-class (KnownSymbol (ComponentID a)) => ScriptComponent a where
-  type ComponentID a :: Symbol
-
-  type Schema a :: [Type]
-
-  getField :: String -> a -> Maybe Primitive
-
-  queryId :: String
-  queryId = symbolVal (Proxy @(ComponentID a))

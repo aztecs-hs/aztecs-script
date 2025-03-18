@@ -11,6 +11,7 @@ import Aztecs.ECS hiding (Query, fetch)
 import Aztecs.Script hiding (Component)
 import Control.Monad
 import Control.Monad.IO.Class
+import Aztecs.Script.Decoder
 
 newtype Position = Position Int deriving (Show)
 

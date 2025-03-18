@@ -1,9 +1,17 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Aztecs.Script.Decoder where
 
-import Data.Dynamic
+import Data.Kind
 import Data.Maybe
+import Data.Typeable
+import GHC.TypeLits
 import Text.Parsec
 import Text.Parsec.String
 
@@ -13,9 +21,24 @@ data FieldAccess = FieldAccess String String
 data Primitive = IntPrimitive Int
   deriving (Show, Eq)
 
+class (KnownSymbol (ComponentID a)) => ScriptComponent a where
+  type ComponentID a :: Symbol
+
+  type Schema a :: [Type]
+
+  getField :: String -> a -> Maybe Primitive
+
+  queryId :: String
+  queryId = symbolVal (Proxy @(ComponentID a))
+
+data DynamicScriptComponent = forall a. (ScriptComponent a) => DynamicScriptComponent a
+
+getFieldDyn :: String -> DynamicScriptComponent -> Maybe Primitive
+getFieldDyn s (DynamicScriptComponent a) = getField s a
+
 data Decoder a where
-  FetchDecoder :: String -> Decoder (String, Dynamic)
-  AsDecoder :: Decoder (String, Dynamic) -> String -> Decoder ()
+  FetchDecoder :: String -> Decoder (String, DynamicScriptComponent)
+  AsDecoder :: Decoder (String, DynamicScriptComponent) -> String -> Decoder ()
   AndDecoder :: Decoder () -> Decoder () -> Decoder ()
   ReturningDecoder :: Decoder a -> [FieldAccess] -> Decoder [Primitive]
 
@@ -25,7 +48,7 @@ skipSpaces = skipMany (oneOf " \t")
 skipSpaces1 :: Parser ()
 skipSpaces1 = skipMany1 (oneOf " \t")
 
-simpleDecoderParser :: Parser (Either (Decoder (String, Dynamic)) (Decoder ()))
+simpleDecoderParser :: Parser (Either (Decoder (String, DynamicScriptComponent)) (Decoder ()))
 simpleDecoderParser = do
   skipSpaces
   _ <- string "FETCH"
