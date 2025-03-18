@@ -29,8 +29,6 @@ import GHC.TypeLits
 import Text.Parsec
 import Text.Parsec.String
 
-data Schema (a :: Symbol) b
-
 data (a :: Symbol) ::: b
 
 class HasField (a :: Symbol) b
@@ -40,14 +38,6 @@ instance {-# OVERLAPPING #-} HasField a ((a ::: b) ': s)
 instance {-# OVERLAPPING #-} HasField a ('[a ::: b])
 
 instance (HasField a s) => HasField a (b ': s)
-
-instance (HasField a bs) => HasField a (Schema s bs)
-
-class Queryable a where
-  queryId :: String
-
-instance (KnownSymbol a) => Queryable (Schema a b) where
-  queryId = symbolVal (Proxy @a)
 
 class KnownAlias (s :: [Symbol]) a
 
@@ -73,7 +63,7 @@ infixr 5 :.
 
 data a :. b = (:.) (Alias a) (Alias b)
 
-instance (KnownSymbol a, KnownSymbol b, HasField b (KnownAliasT s a)) => Row s (a :. b) where
+instance (KnownSymbol a, KnownSymbol b, HasField b (Schema (KnownAliasT s a))) => Row s (a :. b) where
   encodeRow (a :. b) = aliasVal a ++ "." ++ aliasVal b
 
 instance (KnownSymbol s') => Row s (Component s') where
@@ -88,7 +78,7 @@ type family KnownAliasT (scope :: [(Symbol, Type)]) (s :: Symbol) where
   KnownAliasT (_ ': scope) s = KnownAliasT scope s
 
 data Query (s :: [(Symbol, Type)]) (a :: Type) where
-  Fetch :: (Queryable a) => Query '[] a
+  Fetch :: (ScriptComponent a) => Query '[] a
   As :: (KnownSymbol s') => Query s a -> Alias s' -> Query ('(s', a) ': s) ()
   Returning :: (Row s r) => Query s a -> r -> Query s ()
   And :: Query s () -> Query s' () -> Query (s ++ s') ()
@@ -97,7 +87,7 @@ type family (++) (a :: [k]) (b :: [k]) :: [k] where
   '[] ++ b = b
   (a ': as) ++ b = a ': (as ++ b)
 
-fetch :: (Queryable a) => Query '[] a
+fetch :: (ScriptComponent a) => Query '[] a
 fetch = Fetch
 
 as :: (KnownSymbol s') => Query s a -> Alias s' -> Query ('(s', a) ': s) ()
@@ -231,6 +221,9 @@ insertComponent name rt = Runtime $ Map.insert name (ComponentProxy (Proxy @a)) 
 newtype Scope = Scope {unScope :: Map String (String, Dynamic)}
   deriving (Show, Semigroup, Monoid)
 
+buildQuery :: String -> Runtime -> Q.Query [Primitive]
+buildQuery = buildDecoder . decodeQuery
+
 buildDecoder :: Decoder -> Runtime -> Q.Query [Primitive]
 buildDecoder dec rt = (\(_, dyn, _) -> fromMaybe [] $ fromDynamic dyn) <$> buildDecoder' dec rt
 
@@ -265,5 +258,12 @@ buildDecoder' (ReturningDecoder dec fields) rt =
 data Primitive = IntPrimitive Int
   deriving (Show, Eq)
 
-class ScriptComponent a where
+class (KnownSymbol (ComponentID a)) => ScriptComponent a where
+  type ComponentID a :: Symbol
+
+  type Schema a :: [Type]
+
   getField :: String -> a -> Maybe Primitive
+
+  queryId :: String
+  queryId = symbolVal (Proxy @(ComponentID a))
