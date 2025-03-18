@@ -2,6 +2,35 @@
 
 A scripting language for the [Aztecs](https://github.com/aztecs-hs/aztecs) ECS and game-engine.
 
+Aztecs-script aims to be a turing-complete query language that can be used
+for both scripting gameplay and controlling the ECS over a network.
+This package provides both fully-typed Haskell DSL for scripting as well as a low-level interpreter for the text-based scripting language.
+
+#### Haskell:
+
+```hs
+(fetch @Position `as` #p ? fetch @Velocity `as` #v)
+  `returning` (#p :. #x :& #v :. #v)
+```
+
+#### aztecs-script:
+
+```sql
+FETCH position AS p AND FETCH velocity AS v RETURNING (p.x, v.v)
+```
+
+## Features
+
+- Fully-typed DSL and text-based language
+- Queries to the ECS
+  - Reading
+  - (TODO) Writing
+- (TODO) Observers and event triggers
+- (TODO) Control-flow
+- (TODO) Primtive functions and data-types
+
+## Full example
+
 ```hs
 import Aztecs.ECS hiding (Query, fetch)
 import Aztecs.Script hiding (Component)
@@ -52,3 +81,9 @@ app = do
 main :: IO ()
 main = runAccessT_ app
 ```
+
+## Inspiration
+
+- [Squeal](https://github.com/morphismtech/squeal): An incredible Haskell DSL for SQL
+- [Flecs query language](https://github.com/SanderMertens/flecs/blob/master/docs/FlecsQueryLanguage.md):
+  Awesome SQL-like ECS query language

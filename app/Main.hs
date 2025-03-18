@@ -54,4 +54,4 @@ app = do
   forever $ system run
 
 main :: IO ()
-main = runAccessT_ app
+main = print script
