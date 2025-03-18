@@ -12,7 +12,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module MyLib where
+module Aztecs.Script where
 
 import Data.Kind
 import Data.Proxy
@@ -47,8 +47,8 @@ instance {-# OVERLAPPING #-} (KnownSymbol a) => KnownAlias '[a] (Alias a)
 
 instance {-# OVERLAPPING #-} (KnownAlias s a) => KnownAlias (a' ': s) a
 
-infixr 3 :&
 
+infixr 3 :&
 data a :& b = a :& b
 
 class Row s a where
@@ -60,7 +60,6 @@ component :: (KnownSymbol a) => Alias a -> Component a
 component = Component
 
 infixr 5 :.
-
 data a :. b = (:.) (Alias a) (Alias b)
 
 instance (KnownSymbol a, KnownSymbol b, HasField b (KnownAliasT s a)) => Row s (a :. b) where

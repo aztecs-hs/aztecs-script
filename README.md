@@ -1,10 +1,8 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE OverloadedLabels #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeOperators #-}
+# aztecs-script
 
-module Main where
+A scripting language for the [Aztecs](https://github.com/aztecs-hs/aztecs) ECS and game-engine.
 
+```hs
 import Aztecs.Script
 
 type Position = Schema "position" '["x" ::: Int]
@@ -17,3 +15,4 @@ main =
         (fetch @Position `as` #p ? fetch @Velocity `as` #v)
           `returning` (#p :. #x :& #v :. #v)
    in print $ encodeQuery q
+```
