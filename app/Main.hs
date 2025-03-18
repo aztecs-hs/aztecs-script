@@ -11,9 +11,8 @@ import Aztecs.ECS hiding (Query, fetch)
 import Aztecs.Script hiding (Component)
 import Control.Monad
 import Control.Monad.IO.Class
-import Data.Data
 
-newtype Position = Position Int deriving (Show, Data)
+newtype Position = Position Int deriving (Show)
 
 instance Component Position
 
@@ -54,4 +53,4 @@ app = do
   forever $ system run
 
 main :: IO ()
-main = print script
+main = runAccessT_ app

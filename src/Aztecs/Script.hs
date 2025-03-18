@@ -118,12 +118,11 @@ encodeQuery (And a b) = encodeQuery a ++ " AND " ++ encodeQuery b
 data FieldAccess = FieldAccess String String
   deriving (Show, Eq)
 
-data Decoder
-  = FetchDecoder String
-  | AsDecoder Decoder String
-  | AndDecoder Decoder Decoder
-  | ReturningDecoder Decoder [FieldAccess]
-  deriving (Show, Eq)
+data Decoder a where
+  FetchDecoder :: String -> Decoder (String, Dynamic)
+  AsDecoder :: Decoder (String, Dynamic) -> String -> Decoder ()
+  AndDecoder :: Decoder () -> Decoder () -> Decoder ()
+  ReturningDecoder :: Decoder a -> [FieldAccess] -> Decoder [Primitive]
 
 skipSpaces :: Parser ()
 skipSpaces = skipMany (oneOf " \t")
@@ -131,15 +130,17 @@ skipSpaces = skipMany (oneOf " \t")
 skipSpaces1 :: Parser ()
 skipSpaces1 = skipMany1 (oneOf " \t")
 
-simpleDecoderParser :: Parser Decoder
+simpleDecoderParser :: Parser (Either (Decoder (String, Dynamic)) (Decoder ()))
 simpleDecoderParser = do
   skipSpaces
   _ <- string "FETCH"
   skipSpaces1
   qId <- many1 (noneOf " \t\n\r")
   let base = FetchDecoder qId
-  aliases <- many (try asClauseParser)
-  return $ foldl AsDecoder base aliases
+  alias <- optionMaybe (try asClauseParser)
+  case alias of
+    Just a -> return $ Right (AsDecoder base a)
+    Nothing -> return $ Left base
 
 asClauseParser :: Parser String
 asClauseParser = try $ do
@@ -149,15 +150,21 @@ asClauseParser = try $ do
   alias <- many1 (noneOf " \t\n\r")
   return alias
 
-andChainParser :: Parser Decoder
+andChainParser :: Parser (Decoder ())
 andChainParser = do
   first <- simpleDecoderParser
+  let first' = case first of
+        Right d -> d
+        Left _ -> error "TODO"
   rest <- many $ try $ do
     skipSpaces
     _ <- string "AND"
     skipSpaces
-    simpleDecoderParser
-  return $ foldl AndDecoder first rest
+    next <- simpleDecoderParser
+    case next of
+      Right d -> return d
+      Left _ -> error "TODO"
+  return $ foldl AndDecoder first' rest
 
 fieldAccessParser :: Parser FieldAccess
 fieldAccessParser = do
@@ -180,17 +187,15 @@ returningClauseParser = do
   _ <- char ')'
   return fields
 
-decoderParser :: Parser Decoder
+decoderParser :: Parser (Decoder [Primitive])
 decoderParser = do
   chain <- andChainParser
-  ret <- optionMaybe returningClauseParser
+  res <- optionMaybe returningClauseParser
   skipSpaces
   eof
-  case ret of
-    Just r -> return (ReturningDecoder chain r)
-    Nothing -> return chain
+  return . ReturningDecoder chain $ fromMaybe [] res
 
-decodeQuery :: String -> Decoder
+decodeQuery :: String -> Decoder [Primitive]
 decodeQuery input =
   case parse decoderParser "" input of
     Left err -> error ("Failed to parse query: " ++ show err)
@@ -224,23 +229,23 @@ newtype Scope = Scope {unScope :: Map String (String, Dynamic)}
 buildQuery :: String -> Runtime -> Q.Query [Primitive]
 buildQuery = buildDecoder . decodeQuery
 
-buildDecoder :: Decoder -> Runtime -> Q.Query [Primitive]
-buildDecoder dec rt = (\(_, dyn, _) -> fromMaybe [] $ fromDynamic dyn) <$> buildDecoder' dec rt
+buildDecoder :: Decoder [Primitive] -> Runtime -> Q.Query [Primitive]
+buildDecoder dec rt = fst <$> buildDecoder' dec rt
 
-buildDecoder' :: Decoder -> Runtime -> Q.Query (String, Dynamic, Scope)
+buildDecoder' :: Decoder a -> Runtime -> Q.Query (a, Scope)
 buildDecoder' (FetchDecoder qId) rt = case unRuntime rt Map.!? qId of
-  Just cp -> (qId,,mempty) <$> queryComponentProxy cp
+  Just cp -> (\dyn -> ((qId, dyn), mempty)) <$> queryComponentProxy cp
   Nothing -> error "TODO"
 buildDecoder' (AsDecoder dec ident) rt =
   let q = buildDecoder' dec rt
-   in fmap (\(qId, dyn, scope) -> ("", toDyn (), Scope $ Map.insert ident (qId, dyn) (unScope scope))) q
+   in fmap (\((qId, dyn), scope) -> ((), Scope $ Map.insert ident (qId, dyn) (unScope scope))) q
 buildDecoder' (AndDecoder a b) rt =
   let q = buildDecoder' a rt
       q' = buildDecoder' b rt
-   in (\(_, _, scope) (_, _, scope') -> ("", toDyn (), scope' <> scope)) <$> q <*> q'
+   in (\(_, scope) (_, scope') -> ((), scope' <> scope)) <$> q <*> q'
 buildDecoder' (ReturningDecoder dec fields) rt =
-  ( \(_, _, scope) ->
-      let dyns =
+  ( \(_, scope) ->
+      let primitives =
             map
               ( \(FieldAccess record f) -> case unScope scope Map.!? record of
                   Just (ty, dyn) -> case unRuntime rt Map.!? ty of
@@ -251,7 +256,7 @@ buildDecoder' (ReturningDecoder dec fields) rt =
                   Nothing -> error ""
               )
               fields
-       in ("", toDyn dyns, scope)
+       in (primitives, scope)
   )
     <$> buildDecoder' dec rt
 
